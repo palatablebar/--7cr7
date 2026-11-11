@@ -25,6 +25,8 @@ class PartitionSpec(Base):
     health_band: Mapped[str] = mapped_column(String(16), nullable=False, default="degraded")
     # risk: normal | hot (newest partition for the table)
     risk: Mapped[str] = mapped_column(String(16), nullable=False, default="normal")
+    # lifecycle: active | retiring | retired (merge gate for partition retirement)
+    lifecycle: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
     last_compacted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 

@@ -49,6 +49,8 @@ def create_plan(db: Session, user: User, payload) -> dict:
     missing = [value for value in partitions if value not in found]
     if missing:
         raise AppError(ErrorCode.PARTITION_NOT_FOUND, detail={"missing": missing})
+    # 退役冻结中的分区停止新合并
+    partition_service.assert_partitions_mergeable(db, table, partitions)
 
     files = (
         db.query(DataFile)
@@ -195,6 +197,8 @@ def execute_plan(db: Session, user: User, plan_id: int) -> dict:
     table = table_service.get_table_or_404(db, plan.table_id)
     if table.status != TableStatus.ACTIVE.value:
         raise AppError(ErrorCode.TABLE_PAUSED)
+    # 计划生成后若分区被纳入退役单，执行同样被拦截
+    partition_service.assert_partitions_mergeable(db, table, plan.partition_values or [])
     if not acquire_table_lock(table.id):
         raise AppError(ErrorCode.JOB_LOCKED, detail={"table_id": table.id})
 
@@ -241,6 +245,7 @@ def retry_job(db: Session, user: User, job_id: int) -> dict:
         raise AppError("LAKE-2018", message="只有失败的任务可以重试", status_code=409, detail={"status": job.status})
     plan = get_plan_or_404(db, job.plan_id)
     table = table_service.get_table_or_404(db, plan.table_id)
+    partition_service.assert_partitions_mergeable(db, table, plan.partition_values or [])
     if not acquire_table_lock(table.id):
         raise AppError(ErrorCode.JOB_LOCKED, detail={"table_id": table.id})
     new_job = CompactJob(

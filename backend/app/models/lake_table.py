@@ -30,6 +30,7 @@ class LakeTable(Base):
     partitions = relationship("PartitionSpec", back_populates="table", cascade="all, delete-orphan")
     plans = relationship("CompactPlan", back_populates="table", cascade="all, delete-orphan")
     snapshots = relationship("TableSnapshot", back_populates="table", cascade="all, delete-orphan")
+    retirements = relationship("PartitionRetirement", back_populates="table", cascade="all, delete-orphan")
 
     @property
     def fq_name(self) -> str:

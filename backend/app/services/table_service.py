@@ -26,16 +26,18 @@ def _specs(db: Session, table: LakeTable) -> list[PartitionSpec]:
 
 def table_summary(db: Session, table: LakeTable, specs: list[PartitionSpec] | None = None) -> dict:
     specs = specs if specs is not None else _specs(db, table)
+    # 退役冻结/已退役的分区（含 0 文件墓碑）不参与健康度与文件数聚合
+    active_specs = [s for s in specs if s.lifecycle == "active"]
     threshold_bytes = int(table.small_file_threshold_mb) * 1024 * 1024
-    file_count = sum(s.file_count for s in specs)
-    small_count = sum(s.small_file_count for s in specs)
-    total_size = sum(s.total_size_bytes for s in specs)
-    scores = [s.health_score for s in specs]
+    file_count = sum(s.file_count for s in active_specs)
+    small_count = sum(s.small_file_count for s in active_specs)
+    total_size = sum(s.total_size_bytes for s in active_specs)
+    scores = [s.health_score for s in active_specs]
     avg_health = int(round(sum(scores) / len(scores))) if scores else 0
     small_file_rows = (
         db.query(DataFile).filter(DataFile.table_id == table.id, DataFile.size_bytes < threshold_bytes).all()
     )
-    reclaimable = sum(max(0, s.small_file_count - 1) for s in specs)
+    reclaimable = sum(max(0, s.small_file_count - 1) for s in active_specs)
     latest_plan = (
         db.query(CompactPlan)
         .filter(CompactPlan.table_id == table.id)
@@ -43,15 +45,17 @@ def table_summary(db: Session, table: LakeTable, specs: list[PartitionSpec] | No
         .first()
     )
     return {
-        "partition_count": len(specs),
+        "partition_count": len(active_specs),
         "file_count": file_count,
         "small_file_count": small_count,
         "total_size_bytes": total_size,
         "avg_file_size_bytes": int(total_size / file_count) if file_count else 0,
         "avg_health_score": avg_health,
         "avg_health_band": _band(avg_health),
-        "hot_partition_count": sum(1 for s in specs if s.risk == "hot"),
-        "pending_partition_count": sum(1 for s in specs if s.small_file_count > 0),
+        "hot_partition_count": sum(1 for s in active_specs if s.risk == "hot"),
+        "pending_partition_count": sum(1 for s in active_specs if s.small_file_count > 0),
+        "retiring_partition_count": sum(1 for s in specs if s.lifecycle == "retiring"),
+        "retired_partition_count": sum(1 for s in specs if s.lifecycle == "retired"),
         "reclaimable_file_count": reclaimable,
         "small_file_bytes": sum(int(f.size_bytes) for f in small_file_rows),
         "latest_plan_id": latest_plan.id if latest_plan else None,
@@ -90,8 +94,10 @@ def serialize_table(db: Session, table: LakeTable, specs: list[PartitionSpec] | 
                 "health_score": spec.health_score,
                 "health_band": spec.health_band,
                 "risk": spec.risk,
+                "lifecycle": spec.lifecycle,
             }
             for spec in sorted(specs, key=lambda item: item.partition_value)
+            if spec.lifecycle == "active"
         ],
         **summary,
     }

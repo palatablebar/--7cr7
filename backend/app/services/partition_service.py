@@ -6,12 +6,18 @@ health_score formula (documented in README §algorithms / health):
     score         = round(100 * (0.65 * utilization + 0.35 * (1 - fragmentation)))
 band = healthy (>=75) / watch (>=50) / degraded (<50)
 risk = hot when the partition value equals the table's newest partition value.
+
+lifecycle (active | retiring | retired) is owned by the retirement flow and is
+never recomputed here; partitions under retirement with zero files left are
+kept as tombstone rows so the retirement result stays visible.
 """
 from datetime import datetime
 
 from sqlalchemy.orm import Session
 
+from app.constants.error_codes import AppError, ErrorCode
 from app.constants.health_band import FRAGMENTATION_SATURATION, band_for
+from app.constants.partition_lifecycle import PartitionLifecycle
 from app.constants.partition_risk import PartitionRisk
 from app.models import DataFile, LakeTable, PartitionSpec
 from app.schemas.common import iso
@@ -58,10 +64,24 @@ def recompute_table(db: Session, table: LakeTable, *, commit: bool = True) -> li
         spec.risk = PartitionRisk.HOT.value if partition_value == hot_value else PartitionRisk.NORMAL.value
         spec.updated_at = now
 
-    # drop specs for partitions whose files disappeared entirely (should not happen)
+    # partitions whose files disappeared entirely:
+    #   active   -> drop the spec (should not happen outside tests)
+    #   retiring/retired -> keep a zeroed tombstone so the retirement trail and
+    #                       the merge gate survive the file deletion
     for partition_value, spec in list(existing.items()):
         if partition_value not in grouped and spec.id is not None:
-            db.delete(spec)
+            if spec.lifecycle and spec.lifecycle != PartitionLifecycle.ACTIVE.value:
+                spec.file_count = 0
+                spec.small_file_count = 0
+                spec.total_size_bytes = 0
+                spec.total_rows = 0
+                spec.avg_file_size_bytes = 0
+                spec.health_score = 0
+                spec.health_band = "degraded"
+                spec.risk = PartitionRisk.NORMAL.value
+                spec.updated_at = now
+            else:
+                db.delete(spec)
 
     if commit:
         db.commit()
@@ -82,6 +102,28 @@ def get_partition(db: Session, table: LakeTable, partition_value: str) -> Partit
     )
 
 
+def assert_partitions_mergeable(db: Session, table: LakeTable, partition_values: list[str]) -> None:
+    """Gate shared by plan creation / execution: partitions frozen by a
+    retirement order (or already retired) refuse new merges (LAKE-2017)."""
+    if not partition_values:
+        return
+    frozen = [
+        spec.partition_value
+        for spec in db.query(PartitionSpec)
+        .filter(
+            PartitionSpec.table_id == table.id,
+            PartitionSpec.partition_value.in_(list(partition_values)),
+            PartitionSpec.lifecycle != PartitionLifecycle.ACTIVE.value,
+        )
+        .all()
+    ]
+    if frozen:
+        raise AppError(
+            ErrorCode.PARTITION_RETIRING,
+            detail={"partitions": sorted(frozen)},
+        )
+
+
 def serialize_partition(spec: PartitionSpec, table: LakeTable) -> dict:
     return {
         "id": spec.id,
@@ -94,6 +136,7 @@ def serialize_partition(spec: PartitionSpec, table: LakeTable) -> dict:
         "health_score": spec.health_score,
         "health_band": spec.health_band,
         "risk": spec.risk,
+        "lifecycle": spec.lifecycle,
         "last_compacted_at": iso(spec.last_compacted_at),
         "target_file_size_mb": table.target_file_size_mb,
     }

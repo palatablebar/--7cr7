@@ -23,6 +23,8 @@ export interface LakeTable {
   avg_health_band: HealthBand
   hot_partition_count: number
   pending_partition_count: number
+  retiring_partition_count: number
+  retired_partition_count: number
   reclaimable_file_count: number
   small_file_bytes: number
   latest_plan_id: number | null
@@ -38,6 +40,7 @@ export interface PartitionBrief {
   health_score: number
   health_band: HealthBand
   risk: PartitionRisk
+  lifecycle: 'active' | 'retiring' | 'retired'
 }
 
 export interface TableSummary {
@@ -62,6 +65,7 @@ export interface PartitionSpec {
   health_score: number
   health_band: HealthBand
   risk: PartitionRisk
+  lifecycle: 'active' | 'retiring' | 'retired'
   last_compacted_at: string | null
   target_file_size_mb: number
 }

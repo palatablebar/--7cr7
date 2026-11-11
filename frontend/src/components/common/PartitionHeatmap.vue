@@ -16,9 +16,9 @@
 </template>
 
 <script setup lang="ts">
-import type { PartitionSpec } from '../../types/table'
+import type { PartitionBrief } from '../../types/table'
 
-withDefaults(defineProps<{ partitions: PartitionSpec[]; compact?: boolean }>(), { compact: false })
+withDefaults(defineProps<{ partitions: PartitionBrief[]; compact?: boolean }>(), { compact: false })
 </script>
 
 <style scoped>

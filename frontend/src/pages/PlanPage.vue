@@ -34,19 +34,24 @@
             <label
               v-for="partition in tableStore.partitions"
               :key="partition.id"
-              class="flex cursor-pointer items-center gap-2.5 border-b border-[var(--rule-soft)] px-3 py-2 last:border-b-0 hover:bg-[var(--paper)]"
+              class="flex items-center gap-2.5 border-b border-[var(--rule-soft)] px-3 py-2 last:border-b-0"
+              :class="partition.lifecycle === 'active' ? 'cursor-pointer hover:bg-[var(--paper)]' : 'opacity-55'"
               :data-test="`partition-option-${partition.partition_value}`"
             >
               <input
                 type="checkbox"
                 class="accent-[var(--blue)]"
-                :checked="draft.selected.value.includes(partition.partition_value)"
+                :disabled="partition.lifecycle !== 'active'"
+                :checked="partition.lifecycle === 'active' && draft.selected.value.includes(partition.partition_value)"
                 @change="draft.toggle(partition)"
               />
               <span class="font-mono text-[11.5px]">{{ table.partition_key }}={{ partition.partition_value }}</span>
               <span class="ml-auto flex items-center gap-1.5">
                 <span class="num text-[10.5px] text-[var(--rust)]" v-if="partition.small_file_count">{{ partition.small_file_count }} 小</span>
                 <span v-if="partition.risk === 'hot'" class="bp-tag bp-tag--hot !text-[8.5px] !px-1">HOT</span>
+                <span v-if="partition.lifecycle !== 'active'" class="bp-tag bp-tag--watch !text-[8.5px] !px-1">
+                  {{ lifecycleLabel(partition.lifecycle) }}
+                </span>
                 <HealthBadge :band="partition.health_band" :score="partition.health_score" :show-score="false" />
               </span>
             </label>
@@ -186,6 +191,7 @@ import { usePlanStore } from '../stores/planStore'
 import { useAuthStore } from '../stores/authStore'
 import { usePlanDraft } from '../hooks/usePlanDraft'
 import { MESSAGES } from '../constants/messages'
+import { PARTITION_LIFECYCLE_LABELS } from '../constants/partitionLifecycle'
 
 const route = useRoute()
 const router = useRouter()
@@ -198,6 +204,10 @@ const tableId = computed(() => Number(route.params.id))
 const table = computed(() => tableStore.current)
 const plan = computed(() => planStore.current!)
 const canCompute = computed(() => auth.canWrite && draft.selected.value.length > 0)
+
+function lifecycleLabel(lifecycle: string) {
+  return PARTITION_LIFECYCLE_LABELS[lifecycle] ?? lifecycle
+}
 
 onMounted(async () => {
   if (tableId.value) {

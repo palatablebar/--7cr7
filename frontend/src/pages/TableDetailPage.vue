@@ -8,6 +8,9 @@
     >
       <template #actions>
         <RouterLink to="/tables" class="bp-btn">← 返回总览</RouterLink>
+        <RouterLink v-if="table" :to="`/tables/${table.id}/retire`" class="bp-btn" data-test="goto-retire">
+          分区退役
+        </RouterLink>
         <RouterLink
           v-if="table"
           :to="`/tables/${table.id}/plan`"
@@ -48,6 +51,7 @@
                   <th class="text-right">平均大小</th>
                   <th>健康度</th>
                   <th>风险</th>
+                  <th>生命周期</th>
                 </tr>
               </thead>
               <tbody>
@@ -72,6 +76,15 @@
                     <span v-if="partition.risk === 'hot'" class="bp-tag bp-tag--hot">HOT</span>
                     <span v-else class="bp-tag bp-tag--muted">normal</span>
                   </td>
+                  <td>
+                    <span
+                      class="bp-tag"
+                      :class="partition.lifecycle === 'active' ? 'bp-tag--muted' : partition.lifecycle === 'retiring' ? 'bp-tag--watch' : 'bp-tag--ok'"
+                      :data-test="`lifecycle-${partition.partition_value}`"
+                    >
+                      {{ lifecycleLabel(partition.lifecycle) }}
+                    </span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -79,7 +92,7 @@
           <div class="bp-frame__body border-t border-[var(--rule-soft)] !py-2.5">
             <div class="leader-note">
               健康度 = 100 × (0.65 × 平均文件大小 / 目标大小 + 0.35 × (1 − 文件数/60))，
-              最新分区标记为 HOT，计划中建议延后执行。
+              最新分区标记为 HOT，计划中建议延后执行。退役冻结中的分区停止新合并，可前往「分区退役」查看回收清单。
             </div>
           </div>
         </section>
@@ -157,6 +170,7 @@ import ErrorNotice from '../components/common/ErrorNotice.vue'
 import { useTableStore } from '../stores/tableStore'
 import { useAuthStore } from '../stores/authStore'
 import { useTableFilters } from '../hooks/useTableFilters'
+import { PARTITION_LIFECYCLE_LABELS } from '../constants/partitionLifecycle'
 import { formatMb } from '../utils/formatBytes'
 import { formatBytes } from '../utils/formatBytes'
 
@@ -166,6 +180,10 @@ const auth = useAuthStore()
 
 const tableId = computed(() => Number(route.params.id))
 const table = computed(() => tableStore.current)
+
+function lifecycleLabel(lifecycle: string) {
+  return PARTITION_LIFECYCLE_LABELS[lifecycle] ?? lifecycle
+}
 
 const filters = useTableFilters(
   () => tableStore.partitions,

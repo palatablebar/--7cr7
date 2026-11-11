@@ -19,6 +19,12 @@ const router = createRouter({
       component: () => import('../pages/PlanPage.vue'),
       meta: { title: '合并计划预览' },
     },
+    {
+      path: '/tables/:id/retire',
+      name: 'table-retire',
+      component: () => import('../pages/RetirementPage.vue'),
+      meta: { title: '分区退役' },
+    },
     { path: '/jobs', name: 'jobs', component: () => import('../pages/JobsPage.vue'), meta: { title: '任务执行监控' } },
     {
       path: '/snapshots',

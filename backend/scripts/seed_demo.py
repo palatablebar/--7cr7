@@ -26,7 +26,16 @@ from app.config.database import SessionLocal, init_db
 from app.config.settings import settings
 from app.constants.file_format import TableStatus
 from app.constants.plan_status import PlanStatus
-from app.models import CompactJob, CompactPlan, DataFile, LakeTable, PartitionSpec, TableSnapshot, User
+from app.models import (
+    CompactJob,
+    CompactPlan,
+    DataFile,
+    LakeTable,
+    PartitionRetirement,
+    PartitionSpec,
+    TableSnapshot,
+    User,
+)
 from app.services import auth_service, partition_service, snapshot_service
 from app.utils.lake import checksum_of
 from app.utils.logger import log_event
@@ -93,6 +102,14 @@ TABLE_CATALOGUE = [
 
 HIST_PARTITION = "20261108"
 
+# 快照之后迟到的 backfill 文件：不被任何保留快照引用，是退役回收的候选；
+# 同分区的其余文件仍被快照引用而受保护 —— 退役页借此展示 保护引用 vs 可回收。
+BACKFILL_CATALOGUE = [
+    {"table_key": "ods_events", "partition_value": "20261103", "count": 3, "size_range_mb": (9.0, 41.0)},
+    {"table_key": "ods_events", "partition_value": "20261104", "count": 2, "size_range_mb": (12.0, 47.0)},
+    {"table_key": "dwd_orders", "partition_value": "20261107", "count": 3, "size_range_mb": (10.0, 38.0)},
+]
+
 
 def _rng(*parts) -> random.Random:
     digest = hashlib.sha256("|".join(str(p) for p in parts).encode("utf-8")).hexdigest()
@@ -141,6 +158,40 @@ def _make_file(cfg: dict, partition_value: str, index: int, size_mb: float, sour
         "file_format": "parquet",
         "write_source": source,
     }
+
+
+def build_backfill_files() -> dict[str, list[dict]]:
+    """Deterministic late-arriving files, inserted *after* the snapshots."""
+    cfg_by_key = {cfg["key"]: cfg for cfg in TABLE_CATALOGUE}
+    backfill: dict[str, list[dict]] = {}
+    for spec in BACKFILL_CATALOGUE:
+        cfg = cfg_by_key[spec["table_key"]]
+        rng = _rng("backfill", cfg["key"], spec["partition_value"])
+        files: list[dict] = []
+        for index in range(spec["count"]):
+            size_mb = round(rng.uniform(*spec["size_range_mb"]), 1)
+            size_bytes = int(round(size_mb * 1024 * 1024))
+            row_count = max(1, int(size_bytes / cfg["avg_row_bytes"]))
+            digest = hashlib.sha256(
+                f"backfill:{cfg['key']}:{spec['partition_value']}:{index}".encode()
+            ).hexdigest()[:8]
+            path = (
+                f"{settings.LAKE_BUCKET}/warehouse/{cfg['db_name']}/{cfg['table_name']}"
+                f"/{cfg['partition_key']}={spec['partition_value']}/backfill-{index:05d}-{digest}.parquet"
+            )
+            files.append(
+                {
+                    "path": path,
+                    "partition_value": spec["partition_value"],
+                    "size_bytes": size_bytes,
+                    "row_count": row_count,
+                    "checksum": checksum_of(path, row_count, size_bytes),
+                    "file_format": "parquet",
+                    "write_source": "backfill",
+                }
+            )
+        backfill.setdefault(spec["table_key"], []).extend(files)
+    return backfill
 
 
 def _upsert_users(db) -> dict[str, User]:
@@ -267,8 +318,20 @@ def _apply_merge(db, table: LakeTable, plan: CompactPlan) -> dict:
     }
 
 
-def _ensure_desired_files(db, tables: dict[str, LakeTable], catalogue, seed_plan: CompactPlan) -> None:
+def _retired_reclaimed_paths(db) -> set[str]:
+    """Paths already reclaimed by a retired retirement order: the seed must not
+    resurrect them when converging the demo dataset."""
+    reclaimed: set[str] = set()
+    rows = db.query(PartitionRetirement).filter(PartitionRetirement.status == "retired").all()
+    for row in rows:
+        for path in (row.result or {}).get("reclaimed_paths", []):
+            reclaimed.add(path)
+    return reclaimed
+
+
+def _ensure_desired_files(db, tables: dict[str, LakeTable], catalogue, seed_plan: CompactPlan, backfill) -> None:
     """Second-run path: make sure the post-merge file state exists, never duplicate."""
+    retired_paths = _retired_reclaimed_paths(db)
     for cfg in TABLE_CATALOGUE:
         table = tables[cfg["key"]]
         existing = {
@@ -282,6 +345,8 @@ def _ensure_desired_files(db, tables: dict[str, LakeTable], catalogue, seed_plan
                     if item["size_bytes"] < cfg["small_file_threshold_mb"] * 1024 * 1024:
                         continue  # merged away by the historical plan
                 desired.append(item)
+        desired.extend(backfill.get(cfg["key"], []))
+        desired = [item for item in desired if item["path"] not in retired_paths]
         if seed_plan.table_id != table.id:
             added = [item for item in desired if item["path"] not in existing]
             if added:
@@ -314,6 +379,7 @@ def _counts(db) -> dict:
         "compact_plan": int(db.query(func.count(CompactPlan.id)).scalar() or 0),
         "compact_job": int(db.query(func.count(CompactJob.id)).scalar() or 0),
         "table_snapshot": int(db.query(func.count(TableSnapshot.id)).scalar() or 0),
+        "partition_retirement": int(db.query(func.count(PartitionRetirement.id)).scalar() or 0),
         "user": int(db.query(func.count(User.id)).scalar() or 0),
     }
 
@@ -327,6 +393,7 @@ def run_seed(db=None) -> dict:
         users = _upsert_users(session)
         tables = _upsert_tables(session)
         catalogue = build_catalogue()
+        backfill = build_backfill_files()
         seed_plan = session.query(CompactPlan).filter(CompactPlan.note == SEED_PLAN_NOTE).first()
 
         if seed_plan is None:
@@ -412,10 +479,17 @@ def run_seed(db=None) -> dict:
                 created_by=users["engineer"].id,
                 note="订单宽表基线快照 v1",
             )
+
+            # 快照之后迟到的 backfill 文件：不被保留快照引用，成为退役回收候选
+            for cfg in TABLE_CATALOGUE:
+                late_files = backfill.get(cfg["key"], [])
+                if late_files:
+                    _insert_files(session, tables[cfg["key"]], late_files)
+
             log_event("SEED_DEMO_CREATED", plan_id=plan.id, job_id=job.id)
         else:
             # --- repeat run: converge to the same post-merge state ---
-            _ensure_desired_files(session, tables, catalogue, seed_plan)
+            _ensure_desired_files(session, tables, catalogue, seed_plan, backfill)
 
         for cfg in TABLE_CATALOGUE:
             partition_service.recompute_table(session, tables[cfg["key"]])

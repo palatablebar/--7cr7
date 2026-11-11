@@ -24,6 +24,10 @@ class ErrorCode(str, Enum):
     # auth layer
     FORBIDDEN = "LAKE-2015"
     UNAUTHORIZED = "LAKE-2016"
+    # partition retirement
+    PARTITION_RETIRING = "LAKE-2017"
+    RETIREMENT_NOT_FOUND = "LAKE-2019"
+    RETIREMENT_STATE_INVALID = "LAKE-2020"
 
 
 ERROR_MESSAGES = {
@@ -43,6 +47,9 @@ ERROR_MESSAGES = {
     ErrorCode.TABLE_PAUSED: "湖表已暂停，不能生成或执行计划",
     ErrorCode.FORBIDDEN: "当前角色无权执行该操作",
     ErrorCode.UNAUTHORIZED: "未登录或登录已过期",
+    ErrorCode.PARTITION_RETIRING: "分区已纳入退役单并冻结，停止新合并",
+    ErrorCode.RETIREMENT_NOT_FOUND: "退役单不存在",
+    ErrorCode.RETIREMENT_STATE_INVALID: "退役单当前状态不允许该操作",
 }
 
 ERROR_STATUS = {
@@ -62,6 +69,9 @@ ERROR_STATUS = {
     ErrorCode.TABLE_PAUSED: 409,
     ErrorCode.FORBIDDEN: 403,
     ErrorCode.UNAUTHORIZED: 401,
+    ErrorCode.PARTITION_RETIRING: 409,
+    ErrorCode.RETIREMENT_NOT_FOUND: 404,
+    ErrorCode.RETIREMENT_STATE_INVALID: 409,
 }
 
 

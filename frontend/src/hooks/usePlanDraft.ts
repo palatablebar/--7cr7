@@ -19,8 +19,9 @@ export function usePlanDraft() {
   }
 
   function selectDefaults(partitions: PartitionSpec[]) {
-    // default: the two oldest fragmented partitions, hot/newest last in the list
-    const candidates = partitions.filter((item) => item.small_file_count > 0)
+    // default: the two oldest fragmented partitions, hot/newest last in the list;
+    // partitions frozen by a retirement order are never pre-selected
+    const candidates = partitions.filter((item) => item.small_file_count > 0 && item.lifecycle === 'active')
     selected.value = candidates
       .slice()
       .sort((a, b) => a.partition_value.localeCompare(b.partition_value))
