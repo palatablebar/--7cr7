@@ -1,0 +1,377 @@
+/* Blueprint drafting primitives: frames with corner ticks, hairline rules,
+   leader-line annotations, tabular numerals. No shadows, no gradients. */
+
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.display {
+  font-family: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(20px, 2.2vw, 30px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.display-sm {
+  font-family: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  font-size: 17px;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+}
+.label {
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  text-align: right;
+}
+.hr {
+  height: 1px;
+  background: var(--rule-soft);
+}
+.hr-ink {
+  height: 1px;
+  background: var(--rule);
+}
+
+/* framed panel with drafting corner ticks */
+.bp-frame {
+  position: relative;
+  background: var(--paper-2);
+  border: 1px solid var(--rule-soft);
+}
+.bp-frame::before,
+.bp-frame::after {
+  content: '';
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-color: var(--rule);
+  border-style: solid;
+}
+.bp-frame::before {
+  top: -1px;
+  left: -1px;
+  border-width: 1px 0 0 1px;
+}
+.bp-frame::after {
+  right: -1px;
+  bottom: -1px;
+  border-width: 0 1px 1px 0;
+}
+.bp-frame--open {
+  background: transparent;
+  border: 1px solid var(--rule-soft);
+}
+.bp-frame__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.bp-frame__body {
+  padding: 14px;
+}
+
+/* buttons: square, hairline, no fill except the primary stamp */
+.bp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  padding: 6px 13px;
+  font-size: 12px;
+  line-height: 18px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition:
+    background 160ms var(--ease),
+    border-color 160ms var(--ease),
+    transform 160ms var(--ease);
+}
+.bp-btn:hover {
+  background: var(--paper);
+  border-color: var(--blue);
+  color: var(--blue-deep);
+}
+.bp-btn:active {
+  transform: translateY(1px);
+}
+.bp-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.bp-btn--solid {
+  background: var(--blue-deep);
+  border-color: var(--blue-deep);
+  color: var(--paper-2);
+}
+.bp-btn--solid:hover {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: var(--paper-2);
+}
+.bp-btn--danger {
+  border-color: var(--rust);
+  color: var(--rust);
+}
+.bp-btn--danger:hover {
+  background: color-mix(in oklch, var(--rust) 12%, transparent);
+  color: var(--rust);
+}
+.bp-btn--quiet {
+  border-color: transparent;
+  color: var(--ink-soft);
+}
+.bp-btn--quiet:hover {
+  border-color: var(--rule-soft);
+  background: var(--paper);
+}
+
+/* form controls */
+.bp-input,
+.bp-select {
+  width: 100%;
+  border: 1px solid var(--rule-soft);
+  background: var(--paper-2);
+  padding: 6px 9px;
+  font-size: 12.5px;
+  outline: none;
+  transition: border-color 160ms var(--ease);
+}
+.bp-input:focus,
+.bp-select:focus {
+  border-color: var(--blue);
+}
+.bp-input::placeholder {
+  color: var(--ink-faint);
+}
+.bp-select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-soft) 50%),
+    linear-gradient(135deg, var(--ink-soft) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) calc(50% - 2px),
+    calc(100% - 9px) calc(50% - 2px);
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 24px;
+}
+
+/* rail navigation */
+.rail-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 12px 7px 14px;
+  border-left: 2px solid transparent;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  transition:
+    color 160ms var(--ease),
+    border-color 160ms var(--ease),
+    background 160ms var(--ease);
+}
+.rail-link:hover {
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--paper);
+}
+.rail-link.active {
+  border-left-color: var(--blue);
+  color: var(--blue-deep);
+  background: var(--paper);
+}
+.rail-link__index {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+
+/* drafting table */
+.bp-table {
+  width: 100%;
+  font-size: 12.5px;
+}
+.bp-table th {
+  text-align: left;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 500;
+  border-bottom: 1px solid var(--rule);
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+.bp-table td {
+  border-bottom: 1px solid var(--rule-soft);
+  padding: 7px 8px;
+  vertical-align: middle;
+}
+.bp-table tbody tr:hover {
+  background: color-mix(in oklch, var(--paper) 65%, transparent);
+}
+.bp-table .is-selected {
+  background: color-mix(in oklch, var(--blue) 9%, transparent);
+}
+
+/* tags: bracketed technical labels */
+.bp-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--rule-soft);
+  padding: 1px 6px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.bp-tag::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  opacity: 0.72;
+}
+.bp-tag--hot {
+  border-color: var(--rust);
+  color: var(--rust);
+}
+.bp-tag--watch {
+  border-color: var(--ochre);
+  color: oklch(46% 0.11 70);
+}
+.bp-tag--ok {
+  border-color: var(--sea);
+  color: oklch(38% 0.08 195);
+}
+.bp-tag--muted {
+  color: var(--ink-faint);
+}
+
+/* meter / progress rail */
+.meter {
+  position: relative;
+  height: 6px;
+  border: 1px solid var(--rule-soft);
+  background: transparent;
+  overflow: hidden;
+}
+.meter__fill {
+  height: 100%;
+  background: var(--blue);
+  transition: width 480ms var(--ease);
+}
+.meter__fill--hot {
+  background: var(--rust);
+}
+.meter__fill--watch {
+  background: var(--ochre);
+}
+.meter__fill--ok {
+  background: var(--sea);
+}
+
+/* leader-line annotation: a hairline under the label plus a diagonal tick */
+.leader-note {
+  position: relative;
+  padding-left: 16px;
+  border-left: 1px solid var(--rule);
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+.leader-note::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 7px;
+  width: 9px;
+  height: 1px;
+  background: var(--rule);
+  transform: rotate(-42deg);
+}
+.leader-note::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 5px;
+  width: 4px;
+  height: 4px;
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+}
+
+/* corner annotation ticks used by tables/frames */
+.tick-left {
+  padding-left: 10px;
+  border-left: 1px solid var(--rule);
+}
+.tick-top {
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+.crosshair::before {
+  content: '+';
+  color: var(--ink-faint);
+  font-size: 11px;
+  margin-right: 4px;
+}
+
+/* one high-value entrance motion (opacity + translate, exponential easing) */
+@keyframes blueprint-rise {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: blueprint-rise 420ms var(--ease) both;
+}
+.rise-2 {
+  animation: blueprint-rise 520ms var(--ease) 70ms both;
+}
+.rise-3 {
+  animation: blueprint-rise 620ms var(--ease) 140ms both;
+}
+
+/* thin scrollbars that match the drafting mood */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-soft) transparent;
+}
+
+/* responsive: rail becomes a top strip below 1000px */
+@media (max-width: 1000px) {
+  .app-shell {
+    display: block !important;
+  }
+  .app-rail {
+    min-height: auto !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .app-body {
+    padding: 18px !important;
+  }
+}

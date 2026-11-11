@@ -1,0 +1,5 @@
+"""Domain copy shared by the API docs and the frontend rail."""
+CUSTOMER = "拾光内容平台 · 离线数仓小队"
+CUSTOMER_BACKGROUND = "S3 兼容对象存储 40TB · Parquet 表 60 张 · Flink 每小时落小文件"
+PRODUCT_TAGLINE = "数据湖小文件合并与分区整理工坊"
+STRATEGY_NOTE = "FFD 装箱到目标大小，仅重写低于阈值的文件；最新分区按 hot 风险降权。"

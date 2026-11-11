@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #app {
+    min-height: 100%;
+  }
+  body {
+    background-color: var(--paper);
+    /* drafting grid: two 1px rule families, no gradient colour */
+    background-image:
+      repeating-linear-gradient(0deg, transparent 0 23px, var(--grid) 23px 24px),
+      repeating-linear-gradient(90deg, transparent 0 23px, var(--grid) 23px 24px);
+    color: var(--ink);
+    font-family: 'Barlow', 'Helvetica Neue', Helvetica, sans-serif;
+    font-size: 13.5px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--blue) 24%, var(--paper));
+  }
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+  a {
+    color: var(--blue);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  h1,
+  h2,
+  h3 {
+    margin: 0;
+  }
+}

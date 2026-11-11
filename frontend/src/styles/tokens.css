@@ -1,0 +1,22 @@
+/* lakePack design tokens — engineering blueprint.
+   Paper is a cool blue-grey (oklch 93% 0.01 240), ink is deep blue, rules are
+   drafting lines. Every concrete colour in the app comes from this file. */
+:root {
+  --paper: oklch(93% 0.01 240);
+  --paper-2: oklch(96.5% 0.006 240);
+  --paper-3: oklch(88.5% 0.018 240);
+  --rule: oklch(64% 0.05 246);
+  --rule-soft: oklch(80% 0.03 243);
+  --ink: oklch(27% 0.055 248);
+  --ink-soft: oklch(46% 0.04 246);
+  --ink-faint: oklch(62% 0.03 243);
+  --blue: oklch(46% 0.12 252);
+  --blue-deep: oklch(34% 0.1 254);
+  --rust: oklch(55% 0.16 38);
+  --ochre: oklch(66% 0.12 78);
+  --sea: oklch(50% 0.09 195);
+  --grid: oklch(74% 0.035 243 / 0.42);
+  --rail: 252px;
+  --rail-collapsed: 72px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
